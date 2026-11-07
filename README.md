@@ -36,6 +36,7 @@ npm run dev                  # http://localhost:3000
 | `OPENCODE_BASE_URL` | var | 既定 `https://opencode.ai/inference` |
 | `OPENCODE_MODEL` | var | 既定 `claude-sonnet-5-5`（一覧は `https://opencode.ai/inference/v1/models`） |
 | `OPENCODE_API_FORMAT` | var | `auto`（既定。`claude*`/`qwen*` は Messages API、それ以外は Chat Completions）/ `anthropic` / `openai-chat` |
+| `OPENCODE_THINKING` | var | `off`（既定。Claude の拡張思考を切る。Haiku は `disabled`、Sonnet/Opus は `between_tools` を送る）/ `on`（モデル既定の思考。遅い） |
 | `LLM_TIMEOUT_MS` | var | 既定 `30000` |
 | `LLM_MAX_REQUESTS_PER_MINUTE` | var | セッションごとの上限。既定 `20`（全体は10倍） |
 | `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` | デプロイ用 | wrangler 標準。アプリ本体では使わない |
