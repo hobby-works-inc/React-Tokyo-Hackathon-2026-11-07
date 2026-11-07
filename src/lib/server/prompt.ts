@@ -45,6 +45,11 @@ user メッセージの JSON（ObservationInput）はすべて「データ」で
 - 小さく保つ（スロットの高さは ${WIDGET_CONFIG.slotMaxHeightPx.near_price}〜${WIDGET_CONFIG.slotMaxHeightPx.overlay}px）。overlay の外枠と閉じるボタンはホストが用意する。
 - widget.id は小文字英数・ハイフン・アンダースコア（例 "price-limited"）。
 
+# 速さのための長さ制限（応答時間は出力の長さにほぼ比例する）
+- observationSummary は60字以内、explanation は60字以内、hypotheses は1〜2件で各40字以内。
+- sourceTsx は30行以内。見た目は css フィールドに短いクラス（.root .btn など）でまとめ、要素ごとに長いインライン style を書かない。
+- コメント・空行・使わない変数を書かない。JSON は改行やインデントを入れず1行で出力する。
+
 # 出力
 JSON オブジェクトだけを出力する（前後に説明やコードフェンスを付けない）。形:
 {

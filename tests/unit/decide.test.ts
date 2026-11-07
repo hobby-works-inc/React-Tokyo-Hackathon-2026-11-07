@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { handleDecide, resolveMode, validateOutput } from '../../src/lib/server/decide';
-import { resolveFormat } from '../../src/lib/server/opencode';
+import { resolveFormat, thinkingOffParam } from '../../src/lib/server/opencode';
 import { mockDecide } from '../../src/lib/server/mock';
 import { compileWidget } from '../../src/lib/widgetCompiler';
 import { GOOD_TSX, makeInput } from './fixtures';
@@ -81,6 +81,29 @@ describe('handleDecide', () => {
     expect(seen[0]!.auth).toBe('Bearer oc_sk_test');
     expect(seen[0]!.body.max_tokens).toBeGreaterThan(0);
     expect(seen[1]!.body.messages).toHaveLength(3);
+    // 既定では思考を切る（Sonnet 5.5 は between_tools）
+    expect(seen[0]!.body.thinking).toEqual({ type: 'between_tools' });
+  });
+  it('live: thinking 指定を拒否されたら指定なしで1回だけやり直す', async () => {
+    const bodies: any[] = [];
+    const fetchImpl = (async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      bodies.push(body);
+      if (body.thinking) return new Response('{"error":{"message":"thinking.type is not supported"}}', { status: 400 });
+      return new Response(JSON.stringify({ content: [{ type: 'text', text: decisionJson({ action: 'noop' }) }] }), { status: 200 });
+    }) as unknown as typeof fetch;
+    const r = await handleDecide(makeInput({ sessionId: 'live-think' }), { env: { LLM_MODE: 'live', OPENCODE_API_KEY: 'k', OPENCODE_MODEL: 'claude-haiku-5-5' }, fetchImpl });
+    expect(r.status).toBe(200);
+    expect(bodies.map((b) => b.thinking)).toEqual([{ type: 'disabled' }, undefined]);
+  });
+  it('live: OPENCODE_THINKING=on なら thinking を送らない', async () => {
+    let body: any;
+    const fetchImpl = (async (_url: string, init: RequestInit) => {
+      body = JSON.parse(String(init.body));
+      return new Response(JSON.stringify({ content: [{ type: 'text', text: decisionJson({ action: 'noop' }) }] }), { status: 200 });
+    }) as unknown as typeof fetch;
+    await handleDecide(makeInput({ sessionId: 'live-think-on' }), { env: { LLM_MODE: 'live', OPENCODE_API_KEY: 'k', OPENCODE_THINKING: 'on' }, fetchImpl });
+    expect(body.thinking).toBeUndefined();
   });
   it('live: chat completions 形式', async () => {
     let url = '';
@@ -121,6 +144,11 @@ describe('設定', () => {
     expect(resolveFormat('claude-sonnet-5-5', 'auto')).toBe('anthropic');
     expect(resolveFormat('kimi-k3', undefined)).toBe('openai-chat');
     expect(resolveFormat('kimi-k3', 'anthropic')).toBe('anthropic');
+  });
+  it('思考オフの指定値はモデルで変わる', () => {
+    expect(thinkingOffParam('claude-haiku-5-5')).toEqual({ type: 'disabled' });
+    expect(thinkingOffParam('claude-sonnet-5-5')).toEqual({ type: 'between_tools' });
+    expect(thinkingOffParam('gemini-3.8-flash')).toBeUndefined();
   });
 });
 

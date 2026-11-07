@@ -15,6 +15,7 @@ export type ServerEnv = {
   OPENCODE_MODEL?: string;
   OPENCODE_API_FORMAT?: string;
   LLM_TIMEOUT_MS?: string;
+  OPENCODE_THINKING?: string;
   LLM_MAX_REQUESTS_PER_MINUTE?: string;
   DEMO_ACCESS_TOKEN?: string;
 };
@@ -126,6 +127,8 @@ function liveGenerator(deps: DecideDeps, model: string) {
     model,
     format: resolveFormat(model, deps.env.OPENCODE_API_FORMAT),
     timeoutMs: Number(deps.env.LLM_TIMEOUT_MS || 30000),
+    // 既定は off（思考なし）。on にするとモデル既定の思考を使う（遅くなる）
+    thinking: (deps.env.OPENCODE_THINKING || 'off').toLowerCase() === 'on',
   };
   return async (turns: ChatTurn[]) => (await callOpenCode(cfg, SYSTEM_PROMPT, turns, deps.signal, deps.fetchImpl)).text;
 }
