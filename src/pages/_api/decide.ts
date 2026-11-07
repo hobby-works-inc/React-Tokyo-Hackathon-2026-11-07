@@ -14,7 +14,7 @@ export const POST = async (request: Request): Promise<Response> => {
     return Response.json({ ok: false, error: 'invalid json' }, { status: 400 });
   }
   const scenarioHeader = request.headers.get('x-mock-scenario');
-  const known: MockScenario[] = ['broken', 'runtime_error', 'slow', 'auto_option', 'infinite_loop'];
+  const known: MockScenario[] = ['classic', 'broken', 'runtime_error', 'slow', 'auto_option', 'infinite_loop'];
   const mockScenario: MockScenario = known.includes(scenarioHeader as MockScenario) ? (scenarioHeader as MockScenario) : 'default';
   const { status, json } = await handleDecide(body, {
     env: readEnv(),

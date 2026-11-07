@@ -1,4 +1,4 @@
-// /decide の本体。観測入力を検証 → LLM（live）または保存済みレスポンス（mock）→ 出力スキーマ検証 →
+// /decide の本体。観測入力を検証 → LLM（live）または mock の生成（mockGen.ts）→ 出力スキーマ検証 →
 // 生成 TSX の検証・トランスパイル（失敗時は最大1回だけ修正を依頼）。
 // 生成コードはここでは実行しない。
 import { WIDGET_CONFIG } from '../config';
