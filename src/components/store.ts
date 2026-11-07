@@ -79,6 +79,10 @@ export type DemoState = {
   dismissedOverlay: boolean;
   lastSkip: string | null;
   inflight: boolean;
+  /** live の合言葉エラー（解消するまで送信を止める） */
+  authError: string | null;
+  /** 一時的な AI エラーの表示 */
+  llmNotice: string | null;
 };
 
 const initial = (epoch = 0): DemoState => ({
@@ -106,6 +110,8 @@ const initial = (epoch = 0): DemoState => ({
   dismissedOverlay: false,
   lastSkip: null,
   inflight: false,
+  authError: null,
+  llmNotice: null,
 });
 
 let state: DemoState = initial();
@@ -127,7 +133,11 @@ export const store = {
   },
 };
 
+// sessionStorage から復元するまでは書き込まない（初回描画時の空状態で上書きしないため）
+let hydrated = false;
+
 function persist() {
+  if (!hydrated) return;
   try {
     // 表示名など最小限のデモ状態のみ。パスワードは保持しない
     if (state.auth) sessionStorage.setItem(AUTH_KEY, JSON.stringify({ displayName: state.auth.displayName }));
@@ -139,17 +149,19 @@ function persist() {
 }
 
 export function hydrateFromSession() {
+  if (hydrated) return;
   try {
     const a = sessionStorage.getItem(AUTH_KEY);
     const c = sessionStorage.getItem(CART_KEY);
     const auth = a ? (JSON.parse(a) as { displayName?: unknown }) : null;
     const cart = c ? (JSON.parse(c) as CartLine[]) : [];
+    hydrated = true;
     store.set({
       auth: auth && typeof auth.displayName === 'string' ? { displayName: auth.displayName.slice(0, 40) } : null,
       cart: Array.isArray(cart) ? cart.filter((l) => getProduct(l.productId)).map((l) => ({ productId: l.productId, quantity: clampQuantity(l.quantity), optionIds: (l.optionIds ?? []).filter((o) => isKnownOption(l.productId, o)) })) : [],
     });
   } catch {
-    /* ignore */
+    hydrated = true;
   }
 }
 

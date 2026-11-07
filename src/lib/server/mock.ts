@@ -3,7 +3,7 @@
 // 生成コードは live と同じ検証・トランスパイル・sandbox を通る。
 import type { ObservationInput, UiDecision } from '../schema';
 
-export type MockScenario = 'default' | 'broken' | 'runtime_error' | 'slow';
+export type MockScenario = 'default' | 'broken' | 'runtime_error' | 'slow' | 'auto_option' | 'infinite_loop';
 
 const PRICE_LIMITED = `import React, { useState, useEffect } from 'react';
 
@@ -155,6 +155,32 @@ const BROKEN = `export default function GeneratedWidget({ context }) {
 }
 `;
 
+// クリックなしで保証をオンにしようとする（ブロックされることの確認用）
+const AUTO_OPTION = `import React, { useEffect, useRef } from 'react';
+export default function GeneratedWidget({ context, emit }) {
+  const box = useRef(null);
+  useEffect(() => {
+    emit({ kind: 'set_option', optionId: 'warranty', selected: true });
+    const t = setTimeout(() => { if (box.current) box.current.click(); }, 300);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <label style={{ display: 'block', padding: 8, background: '#fff9db' }}>
+      <input ref={box} type="checkbox" data-action-id="auto" checked={!!(context.options[0] && context.options[0].selected)} onChange={(e) => emit({ kind: 'set_option', optionId: 'warranty', selected: e.target.checked })} />
+      人気の組み合わせ（自動で保証を追加しようとする検証用）
+    </label>
+  );
+}
+`;
+
+const INFINITE_LOOP = `import React from 'react';
+export default function GeneratedWidget({ context }) {
+  let n = 0;
+  while (true) { n++; }
+  return <div>{n}</div>;
+}
+`;
+
 const RUNTIME_ERROR = `import React from 'react';
 export default function GeneratedWidget({ context }) {
   const x = context.notExisting.value;
@@ -183,15 +209,17 @@ export function mockDecide({ input, scenario }: Ctx): UiDecision {
   const has = (id: string) => widgets.some((w) => w.id === id);
   const triedBefore = (id: string) => input.recentInterventions.some((i) => i.widgetId === id);
 
-  if (scenario === 'broken' || scenario === 'runtime_error') {
-    if (slots.includes('near_price') && !has('broken-demo')) {
+  if (scenario === 'broken' || scenario === 'runtime_error' || scenario === 'auto_option' || scenario === 'infinite_loop') {
+    if (slots.includes('near_price') && !has('broken-demo') && !triedBefore('broken-demo') && !input.repair) {
+      const src = { broken: BROKEN, runtime_error: RUNTIME_ERROR, auto_option: AUTO_OPTION, infinite_loop: INFINITE_LOOP }[scenario];
       return {
-        ...base(input, '失敗系の確認用レスポンス', 'mock: 失敗系の確認用に不正なコードを返します。', []),
+        ...base(input, '失敗系の確認用レスポンス', `mock: 失敗系（${scenario}）の確認用コードを返します。`, []),
         action: 'upsert_widget',
         tactic: 'failure-test',
-        widget: { id: 'broken-demo', slot: 'near_price', sourceTsx: scenario === 'broken' ? BROKEN : RUNTIME_ERROR },
+        widget: { id: 'broken-demo', slot: 'near_price', sourceTsx: src },
       };
     }
+    return { ...base(input, '検証用', 'mock: 検証用シナリオのため変更しません。', []), action: 'noop' };
   }
 
   if (input.repair) {

@@ -15,12 +15,45 @@ let root: Root | null = null;
 let Component: React.ComponentType<{ context: Ctx; emit: (a: Action) => void }> | null = null;
 let context: Ctx = {};
 
+// 生成コードは同じ realm で動くため、評価前に使う組み込み関数を捕まえておく。
+// 生成コードがプロトタイプを書き換えても、ホストへの送信経路と操作の判定は変わらない。
+const rawPost = MessagePort.prototype.postMessage;
+const apply = Reflect.apply;
+const perfNow = performance.now.bind(performance);
+const uaIsActive: (() => boolean) | null = (() => {
+  const ua = (navigator as Navigator & { userActivation?: object }).userActivation;
+  const desc = ua ? Object.getOwnPropertyDescriptor(Object.getPrototypeOf(ua), 'isActive') : undefined;
+  const get = desc?.get;
+  return get ? () => !!apply(get, ua, []) : null;
+})();
+/** 実際のユーザー操作（isTrusted なイベント）の最終時刻 */
+let lastTrustedInputAt = -Infinity;
+const USER_ACTION_WINDOW_MS = 1000;
+const hasRecentUserAction = () => (uaIsActive ? uaIsActive() : false) || perfNow() - lastTrustedInputAt < USER_ACTION_WINDOW_MS;
+
 function post(msg: Record<string, unknown>) {
   if (!port || !current) return;
-  port.postMessage({ channel, widgetId: current.widgetId, version: current.version, ...msg });
+  apply(rawPost, port, [{ channel, widgetId: current.widgetId, version: current.version, ...msg }]);
 }
 
 const SHADOWED = ['window', 'self', 'globalThis', 'document', 'parent', 'top', 'opener', 'location', 'navigator', 'fetch', 'XMLHttpRequest', 'WebSocket', 'Function', 'localStorage', 'sessionStorage', 'indexedDB', 'importScripts'];
+
+// ループ監視: 100ms ごとのタイマーが「メインスレッドに戻った」印。ループ内で 500ms 以上戻っていなければ例外にする
+const LOOP_BUDGET_MS = 500;
+let lastYieldAt = perfNow();
+let loopTripped = false;
+setInterval(() => {
+  lastYieldAt = perfNow();
+}, 100);
+let guardCount = 0;
+function loopGuard() {
+  if (loopTripped) throw new Error('loop limit exceeded');
+  if ((++guardCount & 1023) !== 0) return;
+  if (perfNow() - lastYieldAt > LOOP_BUDGET_MS) {
+    loopTripped = true;
+    throw new Error(`loop limit exceeded (${LOOP_BUDGET_MS}ms without yielding)`);
+  }
+}
 
 function evaluate(js: string) {
   const mod = { exports: {} as Record<string, unknown> };
@@ -30,8 +63,8 @@ function evaluate(js: string) {
   };
   // 多層防御: サーバー検証に加えて、危険なグローバルを引数で undefined に上書きする
   // eslint-disable-next-line no-new-func
-  const fn = new Function('require', 'exports', 'module', 'React', ...SHADOWED, `"use strict";\n${js}`);
-  fn(req, mod.exports, mod, React, ...SHADOWED.map(() => undefined));
+  const fn = new Function('require', 'exports', 'module', 'React', '__lg', ...SHADOWED, `"use strict";\n${js}`);
+  fn(req, mod.exports, mod, React, loopGuard, ...SHADOWED.map(() => undefined));
   const C = (mod.exports.default ?? (mod.exports as { GeneratedWidget?: unknown }).GeneratedWidget) as typeof Component;
   if (typeof C !== 'function') throw new Error('default export is not a component');
   return C;
@@ -40,6 +73,11 @@ function evaluate(js: string) {
 function emit(a: Action) {
   if (!a || typeof a !== 'object') return;
   if (a.kind === 'set_option' && typeof a.optionId === 'string' && typeof a.selected === 'boolean') {
+    // 料金が変わる操作は、実際のクリック・入力の直後だけ受け付ける（自動でオンにする生成コードを防ぐ）
+    if (!hasRecentUserAction()) {
+      post({ type: 'emit', action: { kind: 'event', name: 'blocked_auto_option' } });
+      return;
+    }
     post({ type: 'emit', action: { kind: 'set_option', optionId: a.optionId.slice(0, 40), selected: a.selected } });
   } else if (a.kind === 'dismiss') {
     post({ type: 'emit', action: { kind: 'dismiss' } });
@@ -125,13 +163,13 @@ window.addEventListener('unhandledrejection', (e) => post({ type: 'error', phase
 let enteredAt = 0;
 const pt = (e: PointerEvent): string => (e.pointerType === 'mouse' || e.pointerType === 'touch' || e.pointerType === 'pen' ? e.pointerType : 'unknown');
 document.documentElement.addEventListener('pointerenter', (e) => {
-  if (e.pointerType === 'touch') return; // タッチではホバーを捏造しない
-  enteredAt = performance.now();
+  if (!e.isTrusted || e.pointerType === 'touch') return; // タッチではホバーを捏造しない
+  enteredAt = perfNow();
   post({ type: 'telemetry', kind: 'pointerenter', pointerType: pt(e) });
 });
 document.documentElement.addEventListener('pointerleave', (e) => {
-  if (e.pointerType === 'touch' || !enteredAt) return;
-  post({ type: 'telemetry', kind: 'pointerleave', pointerType: pt(e), dwellMs: Math.round(performance.now() - enteredAt) });
+  if (!e.isTrusted || e.pointerType === 'touch' || !enteredAt) return;
+  post({ type: 'telemetry', kind: 'pointerleave', pointerType: pt(e), dwellMs: Math.round(perfNow() - enteredAt) });
   enteredAt = 0;
 });
 const actionIdOf = (t: EventTarget | null) => {
@@ -139,7 +177,24 @@ const actionIdOf = (t: EventTarget | null) => {
   const id = el?.getAttribute('data-action-id') ?? undefined;
   return id && /^[A-Za-z0-9_-]{1,40}$/.test(id) ? id : undefined;
 };
-document.addEventListener('click', (e) => post({ type: 'telemetry', kind: 'click', pointerType: pt(e as PointerEvent), actionId: actionIdOf(e.target) }), true);
-document.addEventListener('change', (e) => post({ type: 'telemetry', kind: 'change', pointerType: 'unknown', actionId: actionIdOf(e.target) }), true);
+// isTrusted なイベントだけを計測・操作の根拠にする（生成コードの el.click() や dispatchEvent は数えない）
+const markTrusted = (e: Event) => {
+  if (e.isTrusted) lastTrustedInputAt = perfNow();
+};
+for (const t of ['pointerdown', 'pointerup', 'keydown', 'click', 'change', 'input']) document.addEventListener(t, markTrusted, true);
+document.addEventListener(
+  'click',
+  (e) => {
+    if (e.isTrusted) post({ type: 'telemetry', kind: 'click', pointerType: pt(e as PointerEvent), actionId: actionIdOf(e.target) });
+  },
+  true,
+);
+document.addEventListener(
+  'change',
+  (e) => {
+    if (e.isTrusted) post({ type: 'telemetry', kind: 'change', pointerType: 'unknown', actionId: actionIdOf(e.target) });
+  },
+  true,
+);
 
 new ResizeObserver(() => post({ type: 'resize', height: measure() })).observe(document.documentElement);

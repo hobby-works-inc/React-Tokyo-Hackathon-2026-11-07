@@ -56,6 +56,8 @@ export function compileWidget(sourceTsx: string, css = ''): CompileResult {
   }
 
 
+  if (/__lg/.test(sourceTsx)) return { ok: false, stage: 'forbidden', error: 'identifiers starting with __lg are reserved' };
+
   let js: string;
   try {
     js = transform(sourceTsx, {
@@ -113,6 +115,10 @@ export function compileWidget(sourceTsx: string, css = ''): CompileResult {
         // shorthand { window } は値として参照するので検査対象
         if (!(parentNode.shorthand && parentNode.value === node)) return;
       }
+      if (node.name.startsWith('__lg')) {
+        problems.push({ stage: 'forbidden', msg: 'identifiers starting with __lg are reserved' });
+        return;
+      }
       if (ALLOWED_INJECTED.has(node.name)) return;
       if (FORBIDDEN_IDENTIFIERS.has(node.name)) {
         problems.push({ stage: 'forbidden', msg: `"${node.name}" is not allowed` });
@@ -127,7 +133,41 @@ export function compileWidget(sourceTsx: string, css = ''): CompileResult {
   if (!hasDefaultExport) {
     return { ok: false, stage: 'contract', error: 'widget must `export default function GeneratedWidget({ context, emit })`' };
   }
-  return { ok: true, js, css };
+  return { ok: true, js: insertLoopGuards(js, ast), css };
+}
+
+/** ランタイムが渡すループ監視関数の名前（生成コードからは使えない） */
+export const LOOP_GUARD = '__lg';
+
+const LOOP_TYPES = new Set(['WhileStatement', 'DoWhileStatement', 'ForStatement', 'ForInStatement', 'ForOfStatement']);
+
+/**
+ * すべてのループ本体の先頭に __lg() を差し込む。ランタイムの __lg は、メインスレッドが一定時間
+ * 戻ってこない（タイマーが進まない）と例外を投げるので、無限ループで画面全体が固まるのを防ぐ。
+ */
+export function insertLoopGuards(js: string, ast: ReturnType<typeof parse>): string {
+  const edits: Array<{ pos: number; text: string }> = [];
+  walkSimple(ast, {
+    WhileStatement: visit,
+    DoWhileStatement: visit,
+    ForStatement: visit,
+    ForInStatement: visit,
+    ForOfStatement: visit,
+  } as never);
+  function visit(node: any) {
+    if (!LOOP_TYPES.has(node.type)) return;
+    const body = node.body;
+    if (body.type === 'BlockStatement') {
+      edits.push({ pos: body.start + 1, text: `${LOOP_GUARD}();` });
+    } else {
+      edits.push({ pos: body.start, text: `{${LOOP_GUARD}();` }, { pos: body.end, text: '}' });
+    }
+  }
+  // 後ろから適用して位置をずらさない（同じ位置なら閉じ括弧を先に）
+  edits.sort((a, b) => b.pos - a.pos || (a.text === '}' ? -1 : 1));
+  let out = js;
+  for (const e of edits) out = out.slice(0, e.pos) + e.text + out.slice(e.pos);
+  return out;
 }
 
 // グローバル名と同じ名前のローカル宣言（const open = ...）も安全側に倒して禁止している

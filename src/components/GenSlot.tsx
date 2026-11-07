@@ -13,6 +13,12 @@ export function GenSlot({ slot }: { slot: Exclude<AllowedSlot, 'overlay'> }) {
       {widgets.map((w) => (
         <div key={w.id} className="gen-widget" data-ai-region={`widget:${w.id}`} data-ai-label={`生成UI(${w.id})`} style={{ position: 'relative' }}>
           {w.active ? <span className="gen-tag">AI生成UI{live === 'mock' ? '・mock' : ''}</span> : null}
+          {w.active ? (
+            // 生成コードの中身にかかわらず、ホスト側の閉じる操作を常に用意する
+            <button className="gen-close" data-action-id={`host-close-${w.id}`} aria-label="この生成UIを閉じる" onClick={() => engine.dismissWidget(w.id)}>
+              ×
+            </button>
+          ) : null}
           {[w.active, w.pending].filter(Boolean).map((v) => (
             <SandboxFrame key={v!.version} widgetId={w.id} slot={slot} v={v!} hidden={v !== w.active} />
           ))}

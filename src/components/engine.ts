@@ -26,7 +26,7 @@ function randomId(prefix: string) {
   return prefix + Array.from(a, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-const isBlocked = (s: DemoState = store.get()) => !s.consented || s.finished || (s.orderPlaced && s.mode === 'challenge');
+const isBlocked = (s: DemoState = store.get()) => !s.consented || s.finished || !!s.authError || (s.orderPlaced && s.mode === 'challenge');
 
 // ---------------- public API ----------------
 
@@ -515,6 +515,16 @@ async function dispatch(meta: DispatchMeta): Promise<void> {
     if (mockScenario) headers['x-mock-scenario'] = mockScenario;
     const r = await fetch('/decide', { method: 'POST', headers, body: JSON.stringify(input), signal: meta.signal });
     res = (await r.json()) as DecideResponse;
+    if (r.status === 401) {
+      // 合言葉が違う・未入力。送信を止めて画面で知らせる（401 を送り続けない）
+      store.set({ authError: 'AI を使うには主催者から共有された合言葉が必要です（未入力か、違っています）。' });
+    } else if (r.status === 429) {
+      store.set({ llmNotice: 'AI の呼び出し回数の上限に達しました。少し待つと再開します。' });
+    } else if (!r.ok) {
+      store.set({ llmNotice: `AI の判断に失敗しました（${r.status}）。通常の買い物はそのまま続けられます。` });
+    } else {
+      store.set({ llmNotice: null });
+    }
   } catch (e) {
     if (meta.signal.aborted) {
       // キャンセルされた差分は LLM が見ていないので戻す

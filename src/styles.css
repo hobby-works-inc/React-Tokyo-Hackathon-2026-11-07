@@ -72,6 +72,7 @@ img { max-width: 100%; }
 
 .gen-slot { display: flex; flex-direction: column; gap: 6px; }
 .gen-widget { border-radius: 8px; }
+.gen-close { position: absolute; top: -9px; left: 6px; z-index: 2; width: 18px; height: 18px; line-height: 14px; padding: 0; border-radius: 50%; border: 1px solid #888; background: #fff; font-size: 12px; cursor: pointer; }
 .gen-tag { position: absolute; top: -8px; right: 6px; font-size: 10px; background: #7048e8; color: #fff; border-radius: 6px; padding: 0 6px; z-index: 1; pointer-events: none; }
 
 .cart { display: grid; grid-template-columns: 1fr 300px; gap: 20px; }
@@ -128,3 +129,7 @@ img { max-width: 100%; }
   .cart { grid-template-columns: 1fr; }
   .search { display: none; }
 }
+
+.llm-notice { display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; background: #ffe3e3; color: #8a1c1c; padding: 8px 12px; font-size: 13px; border-bottom: 1px solid #ffa8a8; }
+.llm-notice input { padding: 4px 6px; border: 1px solid #aaa; border-radius: 4px; }
+.llm-notice button { border: 1px solid #8a1c1c; background: #fff; border-radius: 4px; cursor: pointer; }

@@ -40,11 +40,11 @@ export const WIDGET_CONFIG = {
   /** コード修正の再試行回数 */
   maxRepairAttempts: 1,
   slotMaxHeightPx: {
-    near_price: 160,
-    near_shipping: 160,
-    near_purchase: 220,
-    cart_summary: 260,
-    overlay: 420,
+    near_price: 240,
+    near_shipping: 240,
+    near_purchase: 340,
+    cart_summary: 360,
+    overlay: 480,
   },
 } as const;
 

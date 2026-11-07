@@ -38,6 +38,14 @@ describe('compileWidget', () => {
     expect(compileWidget(GOOD_TSX, '.a{background:url(https://e.com/x.png)}').ok).toBe(false);
     expect(compileWidget(GOOD_TSX, '@import "x.css";').ok).toBe(false);
   });
+  it('すべてのループ本体に監視呼び出しを差し込む', () => {
+    const r = compileWidget(`export default function W(){ let i = 0; while (true) i++; for (const x of [1]) { for (;;) {} } return null }`);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.js.match(/__lg\(\);/g)).toHaveLength(3);
+  });
+  it('予約名 __lg は使えない', () => {
+    expect(compileWidget(`export default function W(){ const __lg = () => {}; return null }`).ok).toBe(false);
+  });
   it('プロパティ名としての location 等は許可（オブジェクトキー・メンバー名）', () => {
     expect(compileWidget(`export default function W({context}){ const o = { location: 1 }; return <div>{o.location}{context.document}</div> }`).ok).toBe(true);
   });
