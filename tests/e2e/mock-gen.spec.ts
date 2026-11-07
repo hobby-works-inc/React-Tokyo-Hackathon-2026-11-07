@@ -29,8 +29,10 @@ test('生成 mock: 操作に応じて種類の違う邪魔が次々に出て、�
   await page.mouse.wheel(0, -600);
   await expect.poll(async () => (await collect(), ids.size), { timeout: 25000 }).toBeGreaterThanOrEqual(3);
 
+  // 放っておいても次々に増える（ゲームなので手を止めると邪魔が来る）
+  await expect.poll(async () => (await collect(), ids.size), { timeout: 30000 }).toBeGreaterThanOrEqual(5);
   const families = new Set([...ids].map((id) => id.split('-')[0]));
-  expect(families.size).toBeGreaterThanOrEqual(3);
+  expect(families.size).toBeGreaterThanOrEqual(5);
   expect(errors).toEqual([]);
-  await page.screenshot({ path: test.info().outputPath('mock-gen.png') });
+  await page.screenshot({ path: test.info().outputPath('mock-gen.png'), fullPage: true });
 });

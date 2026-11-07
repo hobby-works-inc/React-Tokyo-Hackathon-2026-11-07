@@ -31,7 +31,7 @@ export const WIDGET_CONFIG = {
   /** 一度に変更するのは原則1ウィジェット */
   maxChangesPerDecision: 1,
   /** 同時表示の最大数 */
-  maxActiveWidgets: 3,
+  maxActiveWidgets: 6,
   /** 生成コードの最大サイズ */
   maxSourceChars: 12000,
   maxCssChars: 4000,

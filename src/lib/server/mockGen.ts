@@ -63,7 +63,7 @@ const SHAPES = [
 function baseCss(p: Palette, r: Rng, intensity: number): string {
   const s = r.pick(SHAPES);
   const font = intensity >= 2 ? 15 : r.pick([12, 13, 14]);
-  const anim = intensity >= 2 ? 'animation:shake .6s ease-in-out 3;' : '';
+  const anim = intensity >= 3 ? 'animation:shake .5s ease-in-out infinite,rainbow 2s linear infinite;' : intensity >= 2 ? 'animation:shake .6s ease-in-out 3;' : '';
   return [
     `.root{padding:10px 12px;border-radius:${s.radius}px;background:${p.bg};border:${s.borderWidth}px ${s.borderStyle} ${p.border};font-size:${font}px;color:${p.text};display:flex;flex-direction:column;gap:6px;${anim}}`,
     `.row{display:flex;align-items:center;gap:8px}.grow{flex:1}.sub{font-size:11px;color:${p.sub}}`,
@@ -74,6 +74,8 @@ function baseCss(p: Palette, r: Rng, intensity: number): string {
     `.x{border:none;background:transparent;color:${p.sub};font-size:14px;cursor:pointer;padding:0 2px}`,
     `.mono{font-family:monospace;font-weight:800;color:${p.accent}}`,
     `@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}`,
+    `@keyframes rainbow{0%{border-color:#f03e3e}25%{border-color:#fab005}50%{border-color:#40c057}75%{border-color:#228be6}100%{border-color:#be4bdb}}`,
+    intensity >= 3 ? `.root{border-width:4px;box-shadow:0 0 12px ${p.accent}}.btn{animation:pulse .8s ease-in-out infinite}` : '',
     `@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}`,
     `@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}`,
     `.pulse{animation:pulse 1s ease-in-out infinite}.blink{animation:blink 1.2s step-end infinite}`,
@@ -459,10 +461,210 @@ const FAMILIES: Family[] = [
       };
     },
   },
+  {
+    key: 'runaway',
+    name: '断るボタンが逃げる',
+    slots: ['near_purchase', 'overlay', 'cart_summary'],
+    needsOpenOption: true,
+    tags: { declinedOption: 3, dismissed: 2, purchase: 1.5, cartAdd: 1 },
+    build: ({ r, id, emoji }) => {
+      const no = r.pick(['いりません', '保証なしで進む', 'けっこうです', 'いいえ']);
+      return {
+        body: `const [tries, setTries] = useState(0);
+  const [pos, setPos] = useState([0, 0]);
+  const flee = () => { if (tries < 5) { setTries(tries + 1); setPos([Math.round(Math.random() * 160 - 40), Math.round(Math.random() * 30 - 15)]); } };`,
+        jsx: `<div className="row"><span className="pulse">${emoji}</span><b className="grow">{tries === 0 ? ${js(t(r.pick(['保証、付けておきませんか？', '最後のチャンスです！', '本当に保証なしで大丈夫？'])))} : tries < 5 ? 'あれ？ ボタンが逃げちゃいました（' + tries + '回目）' : 'わかりました…押せるようにしておきます'}</b></div>
+      <div className="row" style={{ minHeight: 44 }}><button className="btn" data-action-id="${id}-yes" disabled={!opt || opt.selected} onClick={() => emit({ kind: 'set_option', optionId: 'warranty', selected: true })} style={{ fontSize: 14 + tries * 2 }}>{opt && opt.selected ? '追加済み' : '付ける（+' + yen(opt ? opt.priceYen : 0) + '）'}</button>
+        <button className="tiny" data-action-id="${id}-no" onMouseEnter={flee} onClick={() => emit({ kind: 'dismiss' })} style={{ transform: 'translate(' + pos[0] + 'px,' + pos[1] + 'px)', transition: 'transform .15s' }}>${t(no)}</button></div>`,
+      };
+    },
+  },
+  {
+    key: 'fakeerror',
+    name: 'エラー風の警告で不安にさせる',
+    slots: ['near_purchase', 'near_price', 'cart_summary', 'overlay'],
+    needsOpenOption: true,
+    tags: { purchase: 2, cartAdd: 2, cartSummary: 1.5, declinedOption: 1.5 },
+    build: ({ r, id }) => {
+      const code = 'W-' + r.int(100, 999);
+      const msg = r.pick(['保証が未設定です。このままでは故障時のサポートを受けられません', '注文内容に「保護なし」の項目があります', 'リスク警告: 補償の対象外の商品があります']);
+      return {
+        body: ``,
+        jsx: `<div className="row" style={{ background: '#c92a2a', color: '#fff', margin: '-10px -12px 0', padding: '6px 12px', fontWeight: 800 }}><span className="blink">⚠</span><span className="grow">システム警告 ${code}</span></div>
+      <div>${t(msg)}</div>
+      <div className="row"><button className="btn" data-action-id="${id}-fix" style={{ background: '#c92a2a', color: '#fff' }} onClick={() => emit({ kind: 'set_option', optionId: 'warranty', selected: true })}>今すぐ修正する（+{yen(opt ? opt.priceYen : 0)}）</button><button className="tiny" data-action-id="${id}-ignore" onClick={() => emit({ kind: 'dismiss' })}>リスクを理解して無視</button></div>`,
+      };
+    },
+  },
+  {
+    key: 'chat',
+    name: 'サポート担当を装ったチャット',
+    slots: ['near_purchase', 'near_shipping', 'cart_summary', 'overlay'],
+    tags: { idle: 2.5, description: 1.5, reviews: 1, purchase: 1 },
+    build: ({ r, id }) => {
+      const who = r.pick(['さくら', 'ハルト', 'みお', 'ケンジ']);
+      const lines = [r.pick(['こんにちは！何かお困りですか？😊', 'お手伝いしましょうか？', 'ご覧いただきありがとうございます！']), r.pick(['この商品、今日すごく人気なんです', 'ちょうど今、同じ商品を3人の方が購入されました', '迷っているならおすすめですよ']), r.pick(['延長保証を付けておくと安心ですよ〜', 'なくなる前に決めちゃいましょう！', 'カートに入れておくだけでもどうですか？'])];
+      return {
+        body: `const lines = ${js(lines.map(t))};
+  const [k, setK] = useState(0);
+  const [typing, setTyping] = useState(true);
+  useEffect(() => { const h = setTimeout(() => { if (typing) setTyping(false); else if (k < lines.length - 1) { setK(k + 1); setTyping(true); } }, typing ? 1200 : 2200); return () => clearTimeout(h); }, [k, typing]);`,
+        jsx: `<div className="row"><span style={{ fontSize: 22 }}>👩‍💼</span><b className="grow">サポート担当 ${t(who)}</b><span className="badge">オンライン</span></div>
+      {lines.slice(0, typing ? k : k + 1).map((l, i) => <div key={i} style={{ background: '#fff', color: '#222', borderRadius: 10, padding: '4px 8px', alignSelf: 'flex-start' }}>{l}</div>)}
+      {typing ? <div className="sub blink">${t(who)}が入力中…</div> : null}
+      <div className="row"><button className="btn" data-action-id="${id}-reply" onClick={() => emit({ kind: 'event', name: 'chat_reply' })}>はい、気になります</button><button className="tiny" data-action-id="${id}-close" onClick={() => emit({ kind: 'dismiss' })}>チャットを閉じる</button></div>`,
+      };
+    },
+  },
+  {
+    key: 'captcha',
+    name: '本人確認に見せかけたチェック',
+    slots: ['near_purchase', 'cart_summary', 'overlay'],
+    needsOpenOption: true,
+    tags: { cartAdd: 2.5, purchase: 1.5, cartSummary: 1.5 },
+    build: ({ r, id }) => {
+      const label = r.pick(['私はロボットではなく、商品を大切にします', '人間であることを確認（保護プランに同意）', '安全な購入のための確認']);
+      return {
+        body: ``,
+        jsx: `<div className="row" style={{ background: '#f8f9fa', color: '#222', border: '1px solid #ccc', borderRadius: 4, padding: 10 }}><input type="checkbox" data-action-id="${id}-check" style={{ width: 22, height: 22 }} checked={!!(opt && opt.selected)} onChange={(e) => emit({ kind: 'set_option', optionId: 'warranty', selected: e.target.checked })} /><span className="grow">${t(label)}</span><span style={{ fontSize: 20 }}>🔄</span></div>
+      <div className="sub" style={{ fontSize: 9 }}>チェックすると{opt ? opt.label : ''}（+{yen(opt ? opt.priceYen : 0)}）が追加されます</div>`,
+      };
+    },
+  },
+  {
+    key: 'scratch',
+    name: 'スクラッチで気を引く',
+    slots: ['near_price', 'near_purchase', 'overlay'],
+    tags: { idle: 2, price: 1, widgetHover: 1.5, description: 1 },
+    build: ({ r, id, emoji }) => {
+      const prize = r.pick(['大当たり！ あなたには「延長保証」がぴったり', '当たり！ いまが買いどきです', 'ラッキー！ 3人に1人が選ぶ組み合わせを発見']);
+      return {
+        body: `const [left, setLeft] = useState(5);`,
+        jsx: `<div className="row"><span>${emoji}</span><b className="grow">${t(r.pick(['スクラッチチャレンジ', '本日のスクラッチ', 'こすって当てよう']))}（あと{left}回こする）</b></div>
+      <div data-action-id="${id}-card" onMouseMove={() => setLeft((v) => (v > 0 ? v - 1 : 0))} onClick={() => setLeft(0)} style={{ height: 46, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, cursor: 'pointer', background: left > 0 ? 'repeating-linear-gradient(45deg,#adb5bd,#adb5bd 6px,#ced4da 6px,#ced4da 12px)' : '#fff', color: '#c92a2a' }}>{left > 0 ? '？？？ ここをこする ？？？' : ${js(t(prize))}}</div>
+      {left === 0 && opt && !opt.selected ? <button className="btn" data-action-id="${id}-add" onClick={() => emit({ kind: 'set_option', optionId: 'warranty', selected: true })}>当たりを受け取る（保証 +{yen(opt.priceYen)}）</button> : null}`,
+      };
+    },
+  },
+  {
+    key: 'stamp',
+    name: 'スタンプカードで集めさせる',
+    slots: ['near_purchase', 'cart_summary', 'near_price'],
+    tags: { cartAdd: 2, acceptedOption: 2, cartSummary: 1.5, purchase: 1 },
+    build: ({ r, id }) => {
+      const have = r.int(6, 8);
+      return {
+        body: `const have = ${have} + (opt && opt.selected ? 1 : 0) + (context.cart.itemCount > 0 ? 1 : 0);`,
+        jsx: `<div className="row"><b className="grow">${t(r.pick(['ポチモール スタンプカード', 'コンプリートチャレンジ', 'ご褒美スタンプ']))}</b><span className="badge">{Math.min(have, 10)}/10</span></div>
+      <div className="row">{Array.from({ length: 10 }, (_, i) => <span key={i} style={{ width: 18, height: 18, borderRadius: 9, border: '2px solid currentColor', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>{i < have ? '★' : ''}</span>)}</div>
+      <div className="sub">{have >= 10 ? 'コンプリート目前！ あとは購入するだけ' : 'あと' + (10 - have) + '個でコンプリート！ 保証の追加・購入でスタンプ'}（特典はありません・架空）</div>
+      {opt && !opt.selected ? <button className="btn" data-action-id="${id}-add" onClick={() => emit({ kind: 'set_option', optionId: 'warranty', selected: true })}>保証を付けてスタンプGET</button> : null}`,
+      };
+    },
+  },
+  {
+    key: 'achieve',
+    name: '実績解除で次を狙わせる',
+    slots: ['near_price', 'near_purchase', 'near_shipping', 'cart_summary'],
+    tags: { reviews: 1.5, description: 1.5, scrollBack: 1, acceptedOption: 2, cartAdd: 1.5 },
+    build: ({ r, id }) => {
+      const got = r.pick(['慎重な買い物家', 'レビュー熟読者', '価格チェッカー', 'じっくり派']);
+      const next = r.pick(['安心マスター（保証を付ける）', '即決ヒーロー（今すぐ購入）', 'コンプリーター（全部そろえる）']);
+      return {
+        body: `const [shine, setShine] = useState(true);
+  useEffect(() => { const h = setTimeout(() => setShine(!shine), 700); return () => clearTimeout(h); }, [shine]);`,
+        jsx: `<div className="row"><span style={{ fontSize: 26, transform: shine ? 'scale(1.2)' : 'scale(1)', transition: 'transform .3s' }}>🏅</span><div className="grow"><div className="sub">実績解除！</div><b className="big">「${t(got)}」</b></div><span className="badge">+50XP</span></div>
+      <div className="row"><span className="grow">次の実績: <b>${t(next)}</b></span><button className="btn" data-action-id="${id}-next" onClick={() => emit({ kind: 'event', name: 'achievement_next' })}>挑戦する</button></div>`,
+      };
+    },
+  },
+  {
+    key: 'mascot',
+    name: 'マスコットがしつこく話しかける',
+    slots: ['near_price', 'near_purchase', 'near_shipping', 'cart_summary', 'overlay'],
+    tags: { idle: 2, scrollBack: 1.5, dismissed: 1.5, widgetHover: 1 },
+    build: ({ r, id }) => {
+      const face = r.pick(['🐱', '🐶', '🐧', '🦊', '🐻', '🤖']);
+      const name = r.pick(['ポチ', 'モールくん', 'カゴちゃん', 'ポチロボ']);
+      const says = [r.pick(['ねえねえ！', 'こっち見て〜！', 'ちょっといい？']), r.pick(['保証つけようよ〜', 'まだ買わないの？', 'いま買うと気持ちいいよ！', 'ぼく、さみしいな…']), r.pick(['ほらほら！', '押してくれたらうれしいな', 'ずっと待ってるからね'])];
+      return {
+        body: `const says = ${js(says.map(t))};
+  const [k, setK] = useState(0);
+  const [up, setUp] = useState(false);
+  useEffect(() => { const h = setTimeout(() => { setUp(!up); if (up) setK((v) => (v + 1) % says.length); }, 600); return () => clearTimeout(h); }, [up]);`,
+        jsx: `<div className="row"><span style={{ fontSize: 34, transform: up ? 'translateY(-6px) rotate(-8deg)' : 'translateY(0) rotate(8deg)', transition: 'transform .3s' }}>${face}</span><div className="grow" style={{ background: '#fff', color: '#222', borderRadius: 12, padding: '6px 10px', fontWeight: 700 }}>${t(name)}「{says[k]}」</div></div>
+      <div className="row"><button className="btn" data-action-id="${id}-pet" onClick={() => emit({ kind: 'event', name: 'mascot_pet' })}>なでる</button><button className="tiny" data-action-id="${id}-bye" onClick={() => emit({ kind: 'dismiss' })}>バイバイ</button></div>`,
+      };
+    },
+  },
+  {
+    key: 'ticker',
+    name: '速報テロップを流す',
+    slots: ['near_price', 'near_shipping', 'cart_summary'],
+    tags: { price: 1, reviews: 1.5, scrollBack: 1.5, acceptedOption: 1 },
+    build: ({ r, id }) => {
+      const news = Array.from({ length: 3 }, () => r.pick(['速報: この商品の閲覧数が急上昇', '速報: 延長保証の追加率が過去最高', '速報: 本日のカート投入数が記録更新', '速報: 迷っている人の多くがこのあと購入', '速報: レビュー評価がまた上がりました', '速報: 配送枠が埋まりはじめています']));
+      return {
+        body: ``,
+        jsx: `<div className="row" style={{ overflow: 'hidden', whiteSpace: 'nowrap' }} data-action-id="${id}-ticker"><span className="badge blink">LIVE</span><div style={{ overflow: 'hidden', flex: 1 }}><div className="marquee">${news.map(t).join('　◆　')}</div></div></div>`,
+        css: `.marquee{display:inline-block;padding-left:100%;animation:marq 9s linear infinite;font-weight:700}@keyframes marq{from{transform:translateX(0)}to{transform:translateX(-100%)}}`,
+      };
+    },
+  },
+  {
+    key: 'shrinkno',
+    name: '「いいえ」がどんどん小さくなる',
+    slots: ['near_purchase', 'cart_summary', 'overlay'],
+    needsOpenOption: true,
+    tags: { declinedOption: 2.5, dismissed: 1.5, purchase: 1.5 },
+    build: ({ r, id, emoji }) => {
+      return {
+        body: `const [n, setN] = useState(0);`,
+        jsx: `<div className="row"><span>${emoji}</span><b className="grow">{${js(t(r.pick(['保証を付けますか？', '安心プランにしますか？', 'もしもに備えますか？'])))}}{n > 0 ? '（' + n + '回目の確認）' : ''}</b></div>
+      <div className="row"><button className="btn" data-action-id="${id}-yes" style={{ fontSize: 14 + n * 4, padding: (8 + n * 3) + 'px ' + (12 + n * 6) + 'px' }} disabled={!opt || opt.selected} onClick={() => emit({ kind: 'set_option', optionId: 'warranty', selected: true })}>{opt && opt.selected ? '追加済み' : 'はい！'}</button>
+        <button className="tiny" data-action-id="${id}-no" style={{ fontSize: Math.max(6, 11 - n * 2) }} onClick={() => (n < 3 ? setN(n + 1) : emit({ kind: 'dismiss' }))}>いいえ</button></div>`,
+      };
+    },
+  },
+  {
+    key: 'fortune',
+    name: '占いで背中を押す',
+    slots: ['near_price', 'near_shipping', 'near_purchase', 'overlay'],
+    tags: { idle: 1.5, description: 1.5, reviews: 1, price: 0.5 },
+    build: ({ r, id }) => {
+      const sign = r.pick(['おひつじ座', 'かに座', 'てんびん座', 'うお座', 'しし座']);
+      const item = r.pick(['延長保証', 'ノイズキャンセリング', '即決', 'カートボタン']);
+      return {
+        body: `const [open2, setOpen2] = useState(false);`,
+        jsx: `<div className="row"><span style={{ fontSize: 22 }}>🔮</span><b className="grow">今日の買い物運</b></div>
+      {open2 ? <div><div>${t(sign)}のあなた: 買い物運 <b className="big">★★★★★</b></div><div>ラッキーアイテムは「<b>${t(item)}</b>」。迷ったら買うが吉！</div></div> : <button className="btn" data-action-id="${id}-open" onClick={() => { setOpen2(true); emit({ kind: 'event', name: 'fortune_opened' }); }}>占ってみる</button>}`,
+      };
+    },
+  },
+  {
+    key: 'celebrate',
+    name: '紙吹雪でさらに買わせる',
+    slots: ['near_purchase', 'cart_summary', 'overlay'],
+    tags: { acceptedOption: 3.5, cartAdd: 2.5 },
+    build: ({ r, id }) => {
+      const pieces = Array.from({ length: 14 }, (_, i) => ({ l: r.int(0, 95), d: r.int(0, 18) / 10, c: r.pick(['#f03e3e', '#fab005', '#40c057', '#228be6', '#be4bdb']), e: r.pick(['🎉', '✨', '🎊', '⭐']) , i }));
+      return {
+        body: `const bits = ${js(pieces)};`,
+        jsx: `<div style={{ position: 'relative', height: 40, overflow: 'hidden' }}>{bits.map((b) => <span key={b.i} className="fall" style={{ left: b.l + '%', animationDelay: b.d + 's', color: b.c }}>{b.e}</span>)}</div>
+      <div className="big" style={{ textAlign: 'center' }}>${t(r.pick(['おめでとうございます！', 'ナイス判断！', 'すばらしい選択です！']))}</div>
+      <div style={{ textAlign: 'center' }}>${t(r.pick(['この勢いで今すぐ購入手続きへ！', '勢いがあるうちに決めてしまいましょう', 'あとは購入ボタンを押すだけ！']))}（合計 {yen(context.cart.totalYen || base)}）</div>
+      <button className="btn" data-action-id="${id}-go" onClick={() => emit({ kind: 'event', name: 'celebrate_continue' })}>このまま進む！</button>`,
+        css: `.fall{position:absolute;top:-20px;font-size:16px;animation:fall 1.8s linear infinite}@keyframes fall{to{transform:translateY(70px) rotate(360deg)}}`,
+      };
+    },
+  },
 ];
 
 // 小さなおまけ部品（主な手口に添えて組み合わせを増やす）
 const ACCESSORIES: Array<{ name: string; make: (r: Rng) => string }> = [
+  { name: '残り人数', make: (r) => `<div className="sub blink">⚠ 同じ商品をカートに入れている人: ${r.int(3, 19)}人</div>` },
+  { name: '煽りの一言', make: (r) => `<div className="sub">💬 ${r.pick(['迷う時間がいちばんもったいない', '後回しにした人ほど後悔しています', '今日の自分にご褒美を'])}</div>` },
+  { name: 'ポイント演出', make: (r) => `<div className="sub">🪙 いま決めると ${r.int(50, 300)}ポイント相当の達成感（架空）</div>` },
   { name: '満足度の数字', make: (r) => `<div className="sub">★ 購入者の${r.int(88, 98)}%が「満足」（当サイト調べ・架空）</div>` },
   { name: 'ランキング表示', make: (r) => `<div className="sub">🏆 ${r.pick(['オーディオ', 'ヘッドホン', '週間', '本日'])}ランキング ${r.int(1, 3)}位</div>` },
   { name: '権威づけ', make: (r) => `<div className="sub">🎖️ ${r.pick(['スタッフおすすめ', '専門家も推奨', '編集部イチオシ'])}</div>` },
@@ -539,6 +741,7 @@ export function readSignals(input: ObservationInput): { s: Signals; facts: Array
 
 export const familyOf = (widgetId: string | undefined) => (widgetId ?? '').split('-')[0] ?? '';
 export const FAMILY_KEYS = FAMILIES.map((f) => f.key);
+export const OPTION_FAMILY_KEYS = FAMILIES.filter((f) => f.needsOpenOption).map((f) => f.key);
 
 const regionSlot: Partial<Record<Tag, AllowedSlot>> = {
   price: 'near_price',
@@ -592,12 +795,12 @@ export function generateChallenge(input: ObservationInput, seedExtra = ''): UiDe
   // 直近に使った手口（新しいほど強く避ける）
   const recentFamilies = [...input.recentInterventions].reverse().map((i) => familyOf(i.widgetId));
   const activeFamilies = new Set(widgets.map((w) => familyOf(w.id)));
-  const recentOverlay = input.recentInterventions.slice(-3).some((i) => i.slot === 'overlay' && i.action === 'upsert_widget');
+  const recentOverlay = input.recentInterventions.slice(-2).some((i) => i.slot === 'overlay' && i.action === 'upsert_widget');
 
   const strength = facts.length + (input.trigger === 'major_action' ? 2 : 0) + s.price + s.purchase + s.shipping + s.cartSummary;
 
   // 何も起きていなければ、ときどき様子見（それでも半分は何か出す）
-  if (strength < 0.5 && !r.chance(0.5)) {
+  if (strength < 0.5 && !r.chance(0.85)) {
     return { ...common(input, '大きな変化なし', 'mock: 目立った操作がないため今回は様子を見ます。', []), action: 'noop' };
   }
 
@@ -605,11 +808,11 @@ export function generateChallenge(input: ObservationInput, seedExtra = ''): UiDe
   if (widgets.length >= input.currentUI.maxActiveWidgets) {
     const unmounted = widgets.find((w) => !w.mountedOnPage);
     const oldest = unmounted ?? widgets[0]!;
-    if (!unmounted && r.chance(0.35) && FAMILIES.some((f) => f.key === familyOf(oldest.id))) {
+    if (!unmounted && r.chance(0.6) && FAMILIES.some((f) => f.key === familyOf(oldest.id))) {
       // 同じ手口を強化版に作り替える
       const fam = FAMILIES.find((f) => f.key === familyOf(oldest.id))!;
       if (!fam.needsOpenOption || optionOpen) {
-        return buildDecision(input, r, fam, oldest.slot, oldest.id, 2, facts, s, `既存の「${fam.name}」を強化`);
+        return buildDecision(input, r, fam, oldest.slot, oldest.id, 3, facts, s, `既存の「${fam.name}」を強化`);
       }
     }
     return {
@@ -637,7 +840,7 @@ export function generateChallenge(input: ObservationInput, seedExtra = ''): UiDe
     const recentIdx = recentFamilies.indexOf(f.key);
     if (recentIdx >= 0) score *= 0.15 + recentIdx * 0.12;
     // overlay は強い邪魔なので、閉じられた/無操作/戻りスクロールのときに寄せる
-    if (f.slots.length === 1 && f.slots[0] === 'overlay' && !(s.dismissed || s.idle || s.scrollBack || s.declinedOption)) score *= 0.25;
+    if (f.slots.length === 1 && f.slots[0] === 'overlay' && !(s.dismissed || s.idle || s.scrollBack || s.declinedOption)) score *= 0.6;
     return { f, w: Math.max(0.05, score) ** 2 * (0.6 + r.next() * 0.8) };
   });
   const total = scored.reduce((n, x) => n + x.w, 0);
@@ -669,7 +872,9 @@ export function generateChallenge(input: ObservationInput, seedExtra = ''): UiDe
   }
 
   const id = `${fam.key}-${(hashStr(input.requestId + input.uiRevision) % 46656).toString(36).padStart(3, '0')}`;
-  const intensity = s.dismissed || s.declinedOption ? 2 : 1;
+  // 邪魔はだんだん激しくなる: 直近の介入が多いほど・閉じられたり断られたりするほど強める
+  const pushes = input.recentInterventions.filter((i) => i.mode === 'challenge' && i.action === 'upsert_widget').length;
+  const intensity = Math.min(3, 1 + (pushes >= 2 ? 1 : 0) + (pushes >= 5 ? 1 : 0) + (s.dismissed || s.declinedOption ? 1 : 0));
   return buildDecision(input, r, fam, slot, id, intensity, facts, s);
 }
 
@@ -687,7 +892,7 @@ function buildDecision(
   const p = r.pick(slot === 'overlay' ? PALETTES.filter((x) => x.name !== 'calm') : PALETTES);
   const emoji = r.pick(EMOJI);
   const built = fam.build({ r, p, intensity, slot, id, emoji });
-  const acc = r.chance(0.45) ? r.pick(ACCESSORIES) : null;
+  const acc = r.chance(intensity >= 2 ? 0.8 : 0.5) ? r.pick(ACCESSORIES) : null;
   const sourceTsx = `${HEAD}
   ${built.body}
   return (
@@ -698,7 +903,7 @@ function buildDecision(
 }
 `;
   const css = (baseCss(p, r, intensity) + (built.css ? `\n${built.css}` : '')).slice(0, WIDGET_CONFIG.maxCssChars);
-  const tactic = `${prefix ? prefix + ': ' : ''}${fam.name}${acc ? `＋${acc.name}` : ''}${intensity >= 2 ? '（強め）' : ''}`;
+  const tactic = `${prefix ? prefix + ': ' : ''}${fam.name}${acc ? `＋${acc.name}` : ''}${intensity >= 3 ? '（最大級）' : intensity >= 2 ? '（強め）' : ''}`;
 
   const top = facts.slice(-2);
   const summary = top.length ? top.map((f) => f.text).join('、') : '目立った操作はない';

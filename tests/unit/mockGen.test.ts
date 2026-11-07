@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FAMILY_KEYS, familyOf, generateChallenge } from '../../src/lib/server/mockGen';
+import { FAMILY_KEYS, OPTION_FAMILY_KEYS, familyOf, generateChallenge } from '../../src/lib/server/mockGen';
 import { mockDecide } from '../../src/lib/server/mock';
 import { validateOutput } from '../../src/lib/server/decide';
 import type { ObservationInput } from '../../src/lib/schema';
@@ -89,7 +89,7 @@ describe('mock の生成（default）', () => {
         codes.add(d.widget.sourceTsx + d.widget.css);
       }
     }
-    expect(fams.size).toBeGreaterThanOrEqual(10);
+    expect(fams.size).toBeGreaterThanOrEqual(15);
     expect(codes.size).toBeGreaterThan(25);
   });
 
@@ -124,7 +124,7 @@ describe('mock の生成（default）', () => {
     for (const input of variants().filter((v) => v.pageId === 'product')) {
       const sel = { ...input, scenario: { ...input.scenario, pendingOptionIds: ['warranty'] } };
       const d = mockDecide({ input: sel, scenario: 'default' });
-      if (d.action === 'upsert_widget') expect(['confirmshame', 'perday', 'trickbox', 'quiz', 'compare', 'budget', 'nag', 'roulette', 'anchor']).not.toContain(familyOf(d.widget.id));
+      if (d.action === 'upsert_widget') expect(OPTION_FAMILY_KEYS).not.toContain(familyOf(d.widget.id));
     }
   });
 
@@ -155,5 +155,18 @@ describe('mock の生成（default）', () => {
       const again = makeInput({ mode: 'defend', currentUI: { ...input.currentUI, widgets: [{ ...w, version: 2, tactic: d.tactic }] } });
       expect(mockDecide({ input: again, scenario: 'default' }).action).toBe('noop');
     }
+  });
+
+  it('手口は30種類近くあり、介入が続くほど・断られるほど激しくなる', () => {
+    expect(FAMILY_KEYS.length).toBeGreaterThanOrEqual(28);
+    const b = makeInput({ currentUI: { ...makeInput().currentUI, availableSlots: productSlots } });
+    const rec = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `i${i}`, atMs: i, mode: 'challenge' as const, action: 'upsert_widget' as const, widgetId: `zzz-${i}`, slot: 'near_price' as const, tactic: 't', explanation: '', applied: 'applied' as const, followUp: [] }));
+    const tactic = (input: ObservationInput) => {
+      const d = generateChallenge({ ...input, trigger: 'major_action' });
+      return d.action === 'upsert_widget' ? d.tactic : '';
+    };
+    expect(tactic(b)).not.toMatch(/強め|最大級/);
+    expect(tactic({ ...b, recentInterventions: rec(3) })).toMatch(/強め/);
+    expect(tactic({ ...b, recentInterventions: rec(6), recentEvents: [{ id: 'e9', atMs: 1, type: 'widget_dismiss', widgetId: 'zzz-1', isNew: true }] })).toMatch(/最大級/);
   });
 });
