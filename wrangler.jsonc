@@ -6,7 +6,7 @@
   // ここに書いた vars は scripts/cf-postbuild.mjs がデプロイ用設定 (dist/server/wrangler.json) にコピーする。
   // OPENCODE_API_KEY / DEMO_ACCESS_TOKEN はここに書かず `npx wrangler secret put` で登録する。
   "vars": {
-    "LLM_MODE": "live",
+    "LLM_MODE": "mock",
     "OPENCODE_BASE_URL": "https://opencode.ai/inference",
     "OPENCODE_MODEL": "claude-sonnet-5-5",
     "OPENCODE_API_FORMAT": "auto",
