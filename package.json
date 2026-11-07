@@ -1,0 +1,37 @@
+{
+  "name": "genui-nudge-ec",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:sandbox": "node scripts/build-sandbox.mjs",
+    "dev": "npm run build:sandbox && waku dev",
+    "build": "npm run build:sandbox && waku build",
+    "start": "waku start",
+    "build:cf": "npm run build:sandbox && CLOUDFLARE=1 waku build && node scripts/cf-postbuild.mjs",
+    "deploy": "npm run build:cf && wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "e2e": "playwright test --trace off"
+  },
+  "dependencies": {
+    "acorn": "^8.19.0",
+    "acorn-walk": "^8.3.5",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-server-dom-webpack": "^19.3.1",
+    "sucrase": "^3.35.1",
+    "waku": "^1.0.0-rc.4",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0",
+    "wrangler": "^4.158.0"
+  }
+}
