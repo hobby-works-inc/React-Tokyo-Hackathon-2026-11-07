@@ -31,7 +31,7 @@ npm run dev                  # http://localhost:3000
 | 変数 | 種別 | 説明 |
 | --- | --- | --- |
 | `OPENCODE_API_KEY` | secret | OpenCode Console の API キー（`oc_sk_...`）。live で必須 |
-| `DEMO_ACCESS_TOKEN` | secret・任意 | 公開URLを無制限のLLMプロキシにしないための合言葉。セットすると live の呼び出しに、同意画面で入力したトークンが必要 |
+| `DEMO_ACCESS_TOKEN` | secret・任意 | 公開URLを無制限のLLMプロキシにしないための合言葉。セットすると live では同意画面で合言葉の入力と確認が必要。誤り・期限切れで 401 になると、画面上部に表示して送信を止め、再入力で再開する |
 | `LLM_MODE` | var | `mock`（既定）/ `live` |
 | `OPENCODE_BASE_URL` | var | 既定 `https://opencode.ai/inference` |
 | `OPENCODE_MODEL` | var | 既定 `claude-sonnet-5-5`（一覧は `https://opencode.ai/inference/v1/models`） |
@@ -111,7 +111,9 @@ src/pages/_api/decide.ts     POST /decide、 src/pages/_api/mode.ts  GET /mode
 
 ## 既知の制限・未実装
 
-- sandbox は無限ループや CPU 枯渇を完全には防げません。sandbox iframe が別プロセスになるかはブラウザ次第で、同一プロセスだとページ全体が固まることがあります。描画確認の4秒タイムアウトと「リセット」が復旧手段です。サーバー側は生成コードを実行しないため影響を受けません（TSX は12,000文字まで）。
+- 無限ループ対策として、サーバーでの変換時に生成コードのすべてのループ本体へ `__lg()` を差し込みます。ランタイムは、100ms ごとのタイマーが 500ms 以上進んでいなければ例外を投げ、描画失敗として扱います（直前の正常なUIを維持）。ただし、巨大な配列操作や組み込み関数の中の重い処理までは止められず、CPU 枯渇を完全に防ぐものではありません。sandbox iframe が別プロセスになるかはブラウザ次第です。描画確認の4秒タイムアウトと「リセット」が復旧手段です。サーバー側は生成コードを実行しないため影響を受けません（TSX は12,000文字まで）。
+- 生成コードは iframe 内で固定ランタイムと同じ realm で動きます。そのためランタイムは、生成コードの評価前に `postMessage`・`userActivation` などを捕まえておきます。料金が変わる操作（`set_option`）は、`isTrusted` な実際のクリック・入力の直後だけ受け付けます。ホスト側も、直前1.5秒以内に固定ランタイムからクリック/変更の計測が届いていない `set_option` は拒否します。生成コードが `el.click()` や `useEffect` から保証をオンにしようとしても反映されず、`blocked_auto_option` として記録されます。
+- 再読込後も、ログイン表示名とカートは sessionStorage から復元されます。観測・生成UI・同意状態は復元しません（再読込すると同意からやり直しです）。
 - 生成ウィジェットは `'unsafe-eval'` を許可した iframe 内で評価します（不透明オリジン・通信不可の CSP 下）。親ページ自体には CSP ヘッダーを付けていません。
 - レート制限は Workers の isolate 単位のベストエフォートです。公開するなら `DEMO_ACCESS_TOKEN` に加えて Cloudflare の Rate Limiting やアクセス制御を検討してください。
 - ログイン・登録は固定のダミーで、アクセス制御ではありません。表示名とカートだけを sessionStorage に保持します。
