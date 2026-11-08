@@ -153,7 +153,7 @@ describe('設定', () => {
 });
 
 describe('mock の保存済みコードは検証を通る', () => {
-  it('challenge / defend の各ウィジェット', () => {
+  it('classic: challenge / defend の各ウィジェット', () => {
     const inputs = [
       makeInput(),
       makeInput({ recentEvents: [{ id: 'e1', atMs: 1, type: 'cart_add', isNew: true }] }),
@@ -165,7 +165,7 @@ describe('mock の保存済みコードは検証を通る', () => {
     }
     let upserts = 0;
     for (const input of inputs) {
-      const d = mockDecide({ input, scenario: 'default' });
+      const d = mockDecide({ input, scenario: 'classic' });
       if (d.action === 'upsert_widget') {
         upserts++;
         const r = compileWidget(d.widget.sourceTsx, d.widget.css);

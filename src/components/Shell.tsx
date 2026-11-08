@@ -3,14 +3,14 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useRouter } from 'waku';
 import { DevPanel } from './DevPanel';
 import { engine } from './engine';
-import { OverlaySlot } from './GenSlot';
+import { OverlaySlot, StormSlot } from './GenSlot';
 import { Reveal } from './Reveal';
 import { actions, hydrateFromSession, store, useDemo, type PageId } from './store';
 
 export function Shell({ children }: { children: ReactNode }) {
   const consented = useDemo((s) => s.consented);
   const revealOpen = useDemo((s) => s.revealOpen);
-  const overlayOpen = useDemo((s) => s.widgets.some((w) => w.slot === 'overlay' && w.active));
+  const overlayOpen = useDemo((s) => s.widgets.some((w) => (w.slot === 'overlay' || w.slot === 'storm') && w.active));
 
   useEffect(() => {
     hydrateFromSession();
@@ -34,6 +34,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <main className="main">{children}</main>
       <footer className="footer">ポチモール（架空のECサイト）— ハッカソン用の訓練デモです。商品・価格・レビューはすべて架空です。</footer>
       <ControlBar />
+      <StormSlot />
       <OverlaySlot />
       {revealOpen ? <Reveal /> : null}
       {!consented ? <ConsentGate /> : null}
@@ -50,7 +51,7 @@ function TrainingBanner() {
     <div className="training-banner" data-ai-ignore>
       <span>⚠ 訓練用デモ・実際の購入は発生しません</span>
       <span className={`badge ${server?.mode === 'live' ? 'badge-live' : 'badge-mock'}`} data-testid="llm-mode">
-        {server ? (server.mode === 'live' ? `LIVE: ${server.model}` : 'MOCK（保存済みレスポンス）') : '…'}
+        {server ? (server.mode === 'live' ? `LIVE: ${server.model}` : 'MOCK（ルール生成・LLMなし）') : '…'}
       </span>
       <span className={`badge ${mode === 'defend' ? 'badge-defend' : 'badge-challenge'}`} data-testid="ui-mode">
         {mode === 'defend' ? '防御モード（安全なUI）' : '体験モード（誘導UI）'}
@@ -162,7 +163,7 @@ function ConsentGate() {
           <li>課題: {`税込49,800円・送料無料のヘッドホンを、予算50,000円以内・追加保証なしで購入する`}</li>
         </ul>
         <p className="muted">
-          AI: {server ? (server.mode === 'live' ? `LIVE（${server.model}）` : 'MOCK（保存済みレスポンスを使用。ライブ生成ではありません）') : '確認中…'}
+          AI: {server ? (server.mode === 'live' ? `LIVE（${server.model}）` : 'MOCK（手口の部品をルールで組み合わせて生成。LLM は使っていません）') : '確認中…'}
           {server?.reason ? `／${server.reason}` : ''}
         </p>
         {needsToken ? (

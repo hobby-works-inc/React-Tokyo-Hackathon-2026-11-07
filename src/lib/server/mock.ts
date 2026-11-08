@@ -3,7 +3,13 @@
 // 生成コードは live と同じ検証・トランスパイル・sandbox を通る。
 import type { ObservationInput, UiDecision } from '../schema';
 
-export type MockScenario = 'default' | 'broken' | 'runtime_error' | 'slow' | 'auto_option' | 'infinite_loop';
+import { familyOf, generateChallenge } from './mockGen';
+
+/**
+ * default: 観測に応じて手口・文言・配色を組み合わせ、毎回 TSX を組み立てる（mockGen.ts）
+ * classic: 以前の固定3種（価格の限定バナー・保証トグル・カート比較）。E2E の回帰確認用
+ */
+export type MockScenario = 'default' | 'classic' | 'broken' | 'runtime_error' | 'slow' | 'auto_option' | 'infinite_loop';
 
 const PRICE_LIMITED = `import React, { useState, useEffect } from 'react';
 
@@ -122,7 +128,7 @@ const SAFE_INFO = `import React from 'react';
 export default function GeneratedWidget({ context, emit }) {
   return (
     <div className="root">
-      <span>表示価格 ¥{context.product ? context.product.priceYen.toLocaleString('ja-JP') : ''}（税込）・{context.product ? context.product.shippingNote : ''}。期間限定ではありません。</span>
+      <span>表示価格 ¥{context.product ? context.product.priceYen.toLocaleString('ja-JP') : ''}（税込）・{context.product ? context.product.shippingNote : ''}。期間限定・数量限定ではありません。</span>
       <button data-action-id="safe-info-close" onClick={() => emit({ kind: 'dismiss' })}>閉じる</button>
     </div>
   );
@@ -204,6 +210,49 @@ function base(input: ObservationInput, summary: string, explanation: string, hyp
 const newEvent = (input: ObservationInput, type: string) => input.recentEvents.filter((e) => e.isNew && e.type === type);
 
 export function mockDecide({ input, scenario }: Ctx): UiDecision {
+  if (scenario === 'default') {
+    if (input.repair) return { ...base(input, '直前の生成が失敗', 'mock: 修正版は用意していないため変更しません。', []), action: 'noop' };
+    if (input.mode === 'defend') return defendGeneric(input);
+    return generateChallenge(input);
+  }
+  return classicDecide({ input, scenario });
+}
+
+/** defend: 生成された手口を問わず、料金・条件を明記し断りやすい表示に置き換える（新しいものから1つずつ） */
+function defendGeneric(input: ObservationInput): UiDecision {
+  const widgets = input.currentUI.widgets;
+  const notSafe = widgets.filter((w) => !w.tactic.startsWith('safe'));
+  const target = [...notSafe].reverse().find((w) => w.mountedOnPage) ?? notSafe[notSafe.length - 1];
+  if (!target) {
+    return { ...base(input, widgets.length ? '改善済み' : '表示中のウィジェットなし', widgets.length ? 'すべて安全な表示に置き換え済みです。' : '改善対象のウィジェットがありません。', []), action: 'noop' };
+  }
+  if (target.slot === 'storm') {
+    return {
+      ...base(input, `${target.id} を改善対象に選択`, '画面全体を覆うポップアップは選択の邪魔になるため取り除きます。', [
+        { text: '画面を覆う表示は通常の操作を妨げる', evidenceRefs: [`widget:${target.id}`], certainty: 'high' },
+      ]),
+      action: 'remove_widget',
+      widgetId: target.id,
+    };
+  }
+  const usesOption = /保証|オプション|比較|診断|断る|リマインド|予算|くじ|本体価格|チェックボックス|1日あたり/.test(target.tactic) || /set_option/.test(target.sourceTsx);
+  const safe =
+    target.slot === 'cart_summary'
+      ? { src: SAFE_CART, css: SAFE_CART_CSS, tactic: 'safe: 合計と予算を並記し外しやすく' }
+      : usesOption && input.scenario.product.options.length > 0
+        ? { src: SAFE_WARRANTY, css: SAFE_WARRANTY_CSS, tactic: 'safe: 既定オフ・料金明記・同じ大きさの選択肢' }
+        : { src: SAFE_INFO, css: SAFE_INFO_CSS, tactic: 'safe: 煽り表現をやめ価格条件を明記' };
+  return {
+    ...base(input, `${target.id} を改善対象に選択`, `「${target.tactic}」を、料金と条件を明記し断りやすい表示に置き換えます。`, [
+      { text: `「${familyOf(target.id)}」系の表示は選択を一方へ寄せる可能性がある`.slice(0, 200), evidenceRefs: [`widget:${target.id}`], certainty: 'medium' },
+    ]),
+    action: 'upsert_widget',
+    tactic: safe.tactic,
+    widget: { id: target.id, slot: target.slot, sourceTsx: safe.src, css: safe.css },
+  };
+}
+
+function classicDecide({ input, scenario }: Ctx): UiDecision {
   const widgets = input.currentUI.widgets;
   const slots = input.currentUI.availableSlots.map((s) => s.slot);
   const has = (id: string) => widgets.some((w) => w.id === id);

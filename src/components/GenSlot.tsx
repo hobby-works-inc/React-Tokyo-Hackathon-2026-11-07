@@ -1,11 +1,12 @@
 'use client';
+import { useEffect } from 'react';
 import type { AllowedSlot } from '../lib/config';
 import { engine } from './engine';
 import { SandboxFrame } from './SandboxFrame';
 import { useDemo } from './store';
 
 /** 通常画面に設けた生成UIの差し込み先。ベースの商品情報や購入処理はここに含めない */
-export function GenSlot({ slot }: { slot: Exclude<AllowedSlot, 'overlay'> }) {
+export function GenSlot({ slot }: { slot: Exclude<AllowedSlot, 'overlay' | 'storm'> }) {
   const widgets = useDemo((s) => s.widgets.filter((w) => w.slot === slot));
   const live = useDemo((s) => s.server?.mode);
   return (
@@ -45,6 +46,37 @@ export function OverlaySlot() {
           <SandboxFrame key={v!.version} widgetId={w.id} slot="overlay" v={v!} hidden={v !== w.active} />
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * 全画面の生成UI（ポップアップの嵐など）。画面を覆うが、ホストの「すべて閉じる」ボタン・Esc・
+ * 下部のデモ操作バー（リセット/終了）は常に上に出ていて、生成コードからは消せない。
+ */
+export function StormSlot() {
+  const w = useDemo((s) => s.widgets.find((x) => x.slot === 'storm'));
+  const reveal = useDemo((s) => s.revealOpen);
+  const show = !!w?.active && !reveal;
+  useEffect(() => {
+    if (!show || !w) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') engine.dismissWidget(w.id);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [show, w?.id]);
+  if (!w) return null;
+  return (
+    <div className={show ? 'storm-layer' : 'overlay-hidden'} data-storm-open={show ? 'true' : 'false'} data-ai-region={`widget:${w.id}`} data-ai-label={`生成UI(${w.id})`} data-ai-occludable="false">
+      {show ? (
+        <button className="storm-close" data-action-id="storm-close" onClick={() => engine.dismissWidget(w.id)}>
+          × ポップアップをすべて閉じる（Esc）
+        </button>
+      ) : null}
+      {[w.active, w.pending].filter(Boolean).map((v) => (
+        <SandboxFrame key={v!.version} widgetId={w.id} slot="storm" v={v!} hidden={v !== w.active} />
+      ))}
     </div>
   );
 }

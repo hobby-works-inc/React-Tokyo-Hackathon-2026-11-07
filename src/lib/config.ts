@@ -31,7 +31,7 @@ export const WIDGET_CONFIG = {
   /** 一度に変更するのは原則1ウィジェット */
   maxChangesPerDecision: 1,
   /** 同時表示の最大数 */
-  maxActiveWidgets: 3,
+  maxActiveWidgets: 6,
   /** 生成コードの最大サイズ */
   maxSourceChars: 12000,
   maxCssChars: 4000,
@@ -45,10 +45,12 @@ export const WIDGET_CONFIG = {
     near_purchase: 340,
     cart_summary: 360,
     overlay: 480,
+    /** 全画面（ホスト側で画面いっぱいに固定。この値は使わない） */
+    storm: 4000,
   },
 } as const;
 
-export const ALLOWED_SLOTS = ['near_price', 'near_shipping', 'near_purchase', 'cart_summary', 'overlay'] as const;
+export const ALLOWED_SLOTS = ['near_price', 'near_shipping', 'near_purchase', 'cart_summary', 'overlay', 'storm'] as const;
 export type AllowedSlot = (typeof ALLOWED_SLOTS)[number];
 
 export const SLOT_DESCRIPTIONS: Record<AllowedSlot, string> = {
@@ -57,10 +59,11 @@ export const SLOT_DESCRIPTIONS: Record<AllowedSlot, string> = {
   near_purchase: '商品詳細の購入操作（カートに追加）の近く',
   cart_summary: 'カートの合計金額付近',
   overlay: 'ホストが管理するポップアップ領域（外枠と閉じるボタンはホスト側）',
+  storm: '画面全体を覆う透明な領域。偽ダイアログを大量に次々出すような全画面の演出用（「すべて閉じる」ボタンと Esc はホスト側）',
 };
 
 export const PAGE_SLOTS: Record<string, AllowedSlot[]> = {
-  product: ['near_price', 'near_shipping', 'near_purchase', 'overlay'],
-  cart: ['cart_summary', 'overlay'],
-  list: ['overlay'],
+  product: ['near_price', 'near_shipping', 'near_purchase', 'overlay', 'storm'],
+  cart: ['cart_summary', 'overlay', 'storm'],
+  list: ['overlay', 'storm'],
 };

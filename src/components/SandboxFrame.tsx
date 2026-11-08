@@ -138,7 +138,9 @@ export function SandboxFrame({ widgetId, slot, v, hidden }: Props) {
       style={
         hidden
           ? { position: 'absolute', visibility: 'hidden', pointerEvents: 'none', width: '100%', height: 0, border: 0, left: 0, top: 0 }
-          : { width: '100%', height, maxHeight: max, border: 0, display: 'block' }
+          : slot === 'storm'
+            ? { width: '100%', height: '100%', border: 0, display: 'block', background: 'transparent' }
+            : { width: '100%', height, maxHeight: max, border: 0, display: 'block' }
       }
     />
   );

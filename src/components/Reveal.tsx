@@ -141,6 +141,6 @@ export function Reveal() {
 
 function slotName(slot?: string) {
   return (
-    { near_price: '価格の近く', near_shipping: '配送情報の近く', near_purchase: '購入操作の近く', cart_summary: 'カート合計付近', overlay: 'ポップアップ' } as Record<string, string>
+    { near_price: '価格の近く', near_shipping: '配送情報の近く', near_purchase: '購入操作の近く', cart_summary: 'カート合計付近', overlay: 'ポップアップ', storm: '画面全体' } as Record<string, string>
   )[slot ?? ''] ?? slot ?? '';
 }
