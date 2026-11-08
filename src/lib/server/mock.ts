@@ -226,6 +226,15 @@ function defendGeneric(input: ObservationInput): UiDecision {
   if (!target) {
     return { ...base(input, widgets.length ? '改善済み' : '表示中のウィジェットなし', widgets.length ? 'すべて安全な表示に置き換え済みです。' : '改善対象のウィジェットがありません。', []), action: 'noop' };
   }
+  if (target.slot === 'storm') {
+    return {
+      ...base(input, `${target.id} を改善対象に選択`, '画面全体を覆うポップアップは選択の邪魔になるため取り除きます。', [
+        { text: '画面を覆う表示は通常の操作を妨げる', evidenceRefs: [`widget:${target.id}`], certainty: 'high' },
+      ]),
+      action: 'remove_widget',
+      widgetId: target.id,
+    };
+  }
   const usesOption = /保証|オプション|比較|診断|断る|リマインド|予算|くじ|本体価格|チェックボックス|1日あたり/.test(target.tactic) || /set_option/.test(target.sourceTsx);
   const safe =
     target.slot === 'cart_summary'

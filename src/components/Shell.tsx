@@ -3,14 +3,14 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useRouter } from 'waku';
 import { DevPanel } from './DevPanel';
 import { engine } from './engine';
-import { OverlaySlot } from './GenSlot';
+import { OverlaySlot, StormSlot } from './GenSlot';
 import { Reveal } from './Reveal';
 import { actions, hydrateFromSession, store, useDemo, type PageId } from './store';
 
 export function Shell({ children }: { children: ReactNode }) {
   const consented = useDemo((s) => s.consented);
   const revealOpen = useDemo((s) => s.revealOpen);
-  const overlayOpen = useDemo((s) => s.widgets.some((w) => w.slot === 'overlay' && w.active));
+  const overlayOpen = useDemo((s) => s.widgets.some((w) => (w.slot === 'overlay' || w.slot === 'storm') && w.active));
 
   useEffect(() => {
     hydrateFromSession();
@@ -34,6 +34,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <main className="main">{children}</main>
       <footer className="footer">ポチモール（架空のECサイト）— ハッカソン用の訓練デモです。商品・価格・レビューはすべて架空です。</footer>
       <ControlBar />
+      <StormSlot />
       <OverlaySlot />
       {revealOpen ? <Reveal /> : null}
       {!consented ? <ConsentGate /> : null}

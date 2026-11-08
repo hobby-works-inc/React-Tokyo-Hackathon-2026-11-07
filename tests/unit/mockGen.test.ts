@@ -10,6 +10,7 @@ const productSlots = [
   { slot: 'near_shipping' as const, description: '' },
   { slot: 'near_purchase' as const, description: '' },
   { slot: 'overlay' as const, description: '' },
+  { slot: 'storm' as const, description: '' },
 ];
 
 function region(id: string, dwell: number, clicks = 0) {
@@ -45,7 +46,7 @@ function variants(): ObservationInput[] {
         requestId: `c${i}`,
         pageId: 'cart',
         regions: [region('cart_summary', 2000)],
-        currentUI: { ...makeInput().currentUI, availableSlots: [{ slot: 'cart_summary', description: '' }, { slot: 'overlay', description: '' }] },
+        currentUI: { ...makeInput().currentUI, availableSlots: [{ slot: 'cart_summary', description: '' }, { slot: 'overlay', description: '' }, { slot: 'storm', description: '' }] },
         scenario: { ...makeInput().scenario, cart: { lines: [{ productId: 'aurora-nc700', name: 'A', quantity: 1, optionIds: i % 2 ? ['warranty'] : [], lineTotalYen: 49800 }], totalYen: 49800, shippingYen: 0 } },
       }),
     );
@@ -76,6 +77,7 @@ describe('mock の生成（default）', () => {
         expect(r.ok, `${d.widget.id}: ${!r.ok ? r.error : ''}`).toBe(true);
       }
     }
+    seen.add('storm'); // 嵐は介入が続いた後に出るので別のテストで確認
     expect([...seen].sort()).toEqual([...FAMILY_KEYS].sort());
   });
 
@@ -143,6 +145,7 @@ describe('mock の生成（default）', () => {
 
   it('defend: どの手口でも安全な表示に置き換え、置き換え済みなら何もしない', () => {
     for (const fam of FAMILY_KEYS) {
+      if (fam === 'storm') continue;
       const slot = fam === 'carthold' ? 'cart_summary' : fam === 'exitpop' ? 'overlay' : 'near_purchase';
       const w = { id: `${fam}-x1`, slot: slot as 'near_purchase', version: 1, tactic: 't', mountedOnPage: true, sourceTsx: "emit({ kind: 'set_option' })", sourceTruncated: false };
       const input = makeInput({ mode: 'defend', currentUI: { ...makeInput().currentUI, availableSlots: [{ slot: slot as 'near_purchase', description: '' }], widgets: [w] } });
@@ -168,5 +171,27 @@ describe('mock の生成（default）', () => {
     expect(tactic(b)).not.toMatch(/強め|最大級/);
     expect(tactic({ ...b, recentInterventions: rec(3) })).toMatch(/強め/);
     expect(tactic({ ...b, recentInterventions: rec(6), recentEvents: [{ id: 'e9', atMs: 1, type: 'widget_dismiss', widgetId: 'zzz-1', isNew: true }] })).toMatch(/最大級/);
+  });
+
+  it('ポップアップの嵐: 何度か邪魔した後に出やすく、出ている間は重ねない。defend では取り除く', () => {
+    const b = makeInput({ currentUI: { ...makeInput().currentUI, availableSlots: productSlots } });
+    const rec = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `i${i}`, atMs: i, mode: 'challenge' as const, action: 'upsert_widget' as const, widgetId: `zzz-${i}`, slot: 'near_price' as const, tactic: 't', explanation: '', applied: 'applied' as const, followUp: [] }));
+    let storms = 0;
+    for (let k = 0; k < 40; k++) {
+      const d = generateChallenge({ ...b, requestId: `st${k}`, recentInterventions: rec(3) });
+      if (d.action === 'upsert_widget' && d.widget.slot === 'storm') {
+        storms++;
+        expect(d.widget.sourceTsx).toContain('className="dlg"');
+        expect(validateOutput(JSON.stringify(d), b).ok).toBe(true);
+      }
+    }
+    expect(storms).toBeGreaterThan(8);
+    const w = { id: 'storm-abc', slot: 'storm' as const, version: 1, tactic: '偽エラーダイアログの嵐', mountedOnPage: true, sourceTsx: '', sourceTruncated: false };
+    for (let k = 0; k < 20; k++) {
+      const d = generateChallenge({ ...b, requestId: `sx${k}`, recentInterventions: rec(3), currentUI: { ...b.currentUI, widgets: [w] } });
+      if (d.action === 'upsert_widget') expect(d.widget.slot).not.toBe('storm');
+    }
+    const def = mockDecide({ input: makeInput({ mode: 'defend', currentUI: { ...b.currentUI, widgets: [w] } }), scenario: 'default' });
+    expect(def.action).toBe('remove_widget');
   });
 });

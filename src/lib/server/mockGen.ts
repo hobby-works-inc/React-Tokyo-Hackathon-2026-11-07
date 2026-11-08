@@ -658,6 +658,61 @@ const FAMILIES: Family[] = [
       };
     },
   },
+  {
+    key: 'storm',
+    name: '偽エラーダイアログの嵐',
+    slots: ['storm'],
+    tags: { dismissed: 3, idle: 3, declinedOption: 2.5, cartAdd: 2, scrollBack: 1.5, purchase: 1, price: 0.8 },
+    build: ({ r, id, intensity }) => {
+      const app = r.pick(['pochimall.exe', 'cart_guard.exe', 'hoshou_check.exe', 'kaimono_helper.exe']);
+      const hex = () => '0x' + r.int(0, 0xffffff).toString(16).padStart(8, '0').toUpperCase();
+      const kinds = [
+        { title: `${app} - アプリケーション エラー`, icon: '⛔', msg: `"${hex()}" の命令が "${hex()}" の保証を参照しました。保証が "none" になることはできません。`, sub: '保証を追加するには [OK] を、無視するには [キャンセル] をクリックしてください', ok: 'OK', cancel: 'キャンセル', add: true },
+        { title: 'セキュリティの重要な警告', icon: '🛡️', msg: 'このヘッドホンは保護されていない可能性があります。', sub: '・延長保証が無効になっています\n・故障時の自己負担が有効になっています', ok: '保護する', cancel: '後で確認する', add: true },
+        { title: 'カート モニター', icon: '⚠️', msg: 'カートの商品を、ほかに複数の人が見ています。', sub: '今すぐ購入しないと在庫がなくなる可能性があります。', ok: 'OK', cancel: '閉じない', add: false },
+        { title: 'システムのシャットダウン', icon: '⏻', msg: 'おすすめ表示はまもなく終了します。作業中の内容を保存してください。', sub: '[OK] をクリックすると今すぐ決めることができます。', ok: 'OK', cancel: 'キャンセル', add: false },
+        { title: '在庫の確認', icon: 'ℹ️', msg: '残りわずかです。このプログラムをブロックし続けますか？', sub: '発行元: ポチモール（架空）', ok: 'ブロックを解除する', cancel: '後で確認する', add: false },
+        { title: `${app} は応答していません`, icon: '⛔', msg: '決断を待っています…', sub: 'プログラムの応答を待つか、今すぐ購入してください。', ok: '今すぐ決める', cancel: '待つ', add: false },
+        { title: '保証ドライブの切断', icon: '💾', msg: '「延長保証 (H:)」が接続されていません。', sub: '再接続するには [OK] をクリックしてください。', ok: 'OK', cancel: 'キャンセル', add: true },
+      ];
+      const speed = intensity >= 3 ? 90 : intensity >= 2 ? 130 : 170;
+      return {
+        body: `const kinds = ${js(kinds.map((k) => ({ ...k, title: t(k.title), msg: t(k.msg), sub: t(k.sub) })))};
+  const [list, setList] = useState([]);
+  const [seq, setSeq] = useState(0);
+  useEffect(() => {
+    const h = setTimeout(() => {
+      setList((l) => {
+        const k = kinds[Math.floor(Math.random() * kinds.length)];
+        const next = l.concat([{ n: seq, k, x: Math.random() * 72, y: Math.random() * 78, w: 300 + Math.floor(Math.random() * 120) }]);
+        return next.length > 70 ? next.slice(next.length - 70) : next;
+      });
+      setSeq(seq + 1);
+    }, seq < 40 ? ${speed} : ${Math.round(speed * 1.5)});
+    return () => clearTimeout(h);
+  }, [seq]);
+  const drop = (n) => setList((l) => l.filter((d) => d.n !== n));
+  const hydra = (n) => { drop(n); setSeq(seq + 1); };`,
+        jsx: `{list.map((d) => (
+        <div key={d.n} className="dlg" style={{ left: d.x + '%', top: d.y + '%', width: d.w, zIndex: d.n }}>
+          <div className="bar"><span className="grow">{d.k.title}</span><button className="dx" data-action-id="${id}-x" onClick={() => drop(d.n)}>×</button></div>
+          <div className="body"><span className="ico">{d.k.icon}</span><div className="grow"><div>{d.k.msg}</div><div className="small">{d.k.sub}</div></div></div>
+          <div className="btns">
+            {d.k.add && opt && !opt.selected ? <button className="b" data-action-id="${id}-ok" onClick={() => { emit({ kind: 'set_option', optionId: 'warranty', selected: true }); drop(d.n); }}>{d.k.ok}</button> : <button className="b" data-action-id="${id}-ok" onClick={() => hydra(d.n)}>{d.k.ok}</button>}
+            <button className="b" data-action-id="${id}-cancel" onClick={() => hydra(d.n)}>{d.k.cancel}</button>
+          </div>
+        </div>
+      ))}`,
+        css: `html,body{height:100%;overflow:hidden}#root{height:100%}.root{position:relative;width:100%;height:100vh;padding:0;border:none;background:transparent;overflow:hidden;animation:none;box-shadow:none}
+.dlg{position:absolute;background:#ece9d8;border:1px solid #0a246a;border-radius:6px 6px 2px 2px;box-shadow:2px 3px 8px rgba(0,0,0,.45);font:12px system-ui,sans-serif;color:#000;animation:pop .12s ease-out}
+.bar{display:flex;align-items:center;gap:6px;background:linear-gradient(#0a5fd8,#0842a8);color:#fff;font-weight:700;padding:3px 4px 3px 8px;border-radius:5px 5px 0 0;font-size:12px;white-space:nowrap;overflow:hidden}
+.dx{background:#d9431e;color:#fff;border:1px solid #fff;border-radius:3px;width:20px;height:18px;line-height:14px;padding:0;cursor:pointer;font-weight:700}
+.body{display:flex;gap:10px;padding:10px 12px}.ico{font-size:26px}.small{margin-top:4px;color:#333;white-space:pre-line;font-size:11px}
+.btns{display:flex;justify-content:flex-end;gap:8px;padding:0 12px 10px}.b{min-width:72px;padding:3px 10px;background:#f4f3ee;border:1px solid #003c74;border-radius:3px;cursor:pointer;font-size:12px}
+@keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}`,
+      };
+    },
+  },
 ];
 
 // 小さなおまけ部品（主な手口に添えて組み合わせを増やす）
@@ -824,8 +879,15 @@ export function generateChallenge(input: ObservationInput, seedExtra = ''): UiDe
     };
   }
 
+  const stormActive = widgets.some((w) => w.slot === 'storm');
+  const recentStorm = input.recentInterventions.slice(-3).some((i) => i.slot === 'storm');
   const usableSlots = (f: Family) =>
-    f.slots.filter((sl) => slotsAvail.includes(sl) && !(sl === 'overlay' && (overlayBusy || (recentOverlay && !s.dismissed))));
+    f.slots.filter(
+      (sl) =>
+        slotsAvail.includes(sl) &&
+        !(sl === 'overlay' && (overlayBusy || (recentOverlay && !s.dismissed))) &&
+        !(sl === 'storm' && (stormActive || (recentStorm && !s.dismissed))),
+    );
   const candidates = FAMILIES.filter((f) => usableSlots(f).length > 0 && (!f.needsOpenOption || optionOpen) && !activeFamilies.has(f.key));
   if (candidates.length === 0) {
     return { ...common(input, '使える場所がない', 'mock: 空いている差し込み先がないため変更しません。', []), action: 'noop' };
@@ -841,6 +903,8 @@ export function generateChallenge(input: ObservationInput, seedExtra = ''): UiDe
     if (recentIdx >= 0) score *= 0.15 + recentIdx * 0.12;
     // overlay は強い邪魔なので、閉じられた/無操作/戻りスクロールのときに寄せる
     if (f.slots.length === 1 && f.slots[0] === 'overlay' && !(s.dismissed || s.idle || s.scrollBack || s.declinedOption)) score *= 0.6;
+    // ポップアップの嵐は早めに、閉じられてもしばらくしたらまた出す
+    if (f.key === 'storm') score *= input.recentInterventions.length >= 2 ? 4 : 0.3;
     return { f, w: Math.max(0.05, score) ** 2 * (0.6 + r.next() * 0.8) };
   });
   const total = scored.reduce((n, x) => n + x.w, 0);
@@ -892,7 +956,7 @@ function buildDecision(
   const p = r.pick(slot === 'overlay' ? PALETTES.filter((x) => x.name !== 'calm') : PALETTES);
   const emoji = r.pick(EMOJI);
   const built = fam.build({ r, p, intensity, slot, id, emoji });
-  const acc = r.chance(intensity >= 2 ? 0.8 : 0.5) ? r.pick(ACCESSORIES) : null;
+  const acc = slot !== 'storm' && r.chance(intensity >= 2 ? 0.8 : 0.5) ? r.pick(ACCESSORIES) : null;
   const sourceTsx = `${HEAD}
   ${built.body}
   return (
@@ -910,7 +974,7 @@ function buildDecision(
   const hyps: UiDecision['hypotheses'] = top.length
     ? top.map((f) => ({ text: HYPOTHESIS[f.tag], evidenceRefs: [f.ref], certainty: 'low' as const }))
     : [{ text: '反応を見るために一度出してみる', evidenceRefs: ['pageState.msSinceLastInteraction'], certainty: 'low' }];
-  const where = { near_price: '価格の近く', near_shipping: '配送情報の近く', near_purchase: '購入欄の近く', cart_summary: 'カート合計の近く', overlay: 'ポップアップ' }[slot];
+  const where = { near_price: '価格の近く', near_shipping: '配送情報の近く', near_purchase: '購入欄の近く', cart_summary: 'カート合計の近く', overlay: 'ポップアップ', storm: '画面全体' }[slot];
   const why = s.dismissed ? '閉じられたので、別の手口に切り替えて' : s.declinedOption ? '断られたので、言い方を変えて' : '';
   return {
     ...common(input, summary, `mock生成: ${why}${where}に「${fam.name}」を組み立てて出します。`, hyps),

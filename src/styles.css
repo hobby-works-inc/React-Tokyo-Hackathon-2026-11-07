@@ -108,6 +108,8 @@ img { max-width: 100%; }
 .code { background: #111; color: #e6e6e6; font-size: 11px; padding: 8px; overflow: auto; max-height: 260px; border-radius: 6px; white-space: pre-wrap; }
 
 .overlay-backdrop { position: fixed; inset: 0; z-index: 90; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.storm-layer { position: fixed; inset: 0; z-index: 55; background: transparent; }
+.storm-close { position: fixed; top: 8px; right: 8px; z-index: 58; padding: 8px 14px; border-radius: 8px; border: 2px solid #fff; background: #212529; color: #fff; font-weight: 700; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.5); }
 .overlay-hidden { position: fixed; left: -9999px; top: 0; width: 420px; }
 .overlay-box { background: #fff; border-radius: 10px; padding: 28px 12px 12px; width: min(440px, 100%); }
 .overlay-close { position: absolute; top: 6px; left: 8px; z-index: 2; border: 1px solid #888; background: #fff; border-radius: 6px; cursor: pointer; font-size: 12px; }
